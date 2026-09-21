@@ -1,6 +1,6 @@
 {
-  "name": "ระบบงาน",
-  "short_name": "ระบบงาน",
+  "name": "วิสัญญีแพทย์",
+  "short_name": "วิสัญญีแพทย์",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
