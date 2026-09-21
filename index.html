@@ -7,7 +7,7 @@
   
   <!-- Manifest for Android / Chrome -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1a73e8">
+  <meta name="theme-color" content="#0d6efd">
 
   <!-- iOS PWA Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -26,37 +26,9 @@
       height: 100%;
       overflow: hidden;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #f8f9fa;
+      background-color: #f4f7f6;
     }
     
-    /* แถบคำแนะนำการติดตั้ง */
-    #install-banner {
-      background: #e8f0fe;
-      color: #1967d2;
-      padding: 10px 14px;
-      font-size: 13px;
-      line-height: 1.4;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid #d2e3fc;
-      z-index: 999;
-      position: relative;
-    }
-    #install-banner .text strong {
-      display: block;
-      margin-bottom: 2px;
-      color: #174ea6;
-    }
-    #close-banner {
-      background: none;
-      border: none;
-      font-size: 18px;
-      color: #5f6368;
-      cursor: pointer;
-      padding: 0 8px;
-    }
-
     /* กล่อง iframe เต็มจอ */
     .frame-container {
       width: 100%;
@@ -65,28 +37,40 @@
       top: 0;
       left: 0;
     }
-    .has-banner .frame-container {
-      top: 58px;
-      height: calc(100% - 58px);
-    }
     iframe {
       width: 100%;
       height: 100%;
       border: none;
     }
+
+    /* UI แถบแจ้งเตือนให้ติดตั้ง (แบบ PRE-OP) */
+    #installBanner { 
+      display: none; 
+      position: fixed; 
+      bottom: 0; 
+      width: 100%; 
+      background: #0d6efd; 
+      color: white; 
+      text-align: center; 
+      padding: 15px 10px; 
+      z-index: 9999; 
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    }
+    .btn-install { 
+      background: white; 
+      color: #0d6efd; 
+      border: none; 
+      padding: 8px 16px; 
+      border-radius: 8px; 
+      cursor: pointer; 
+      font-weight: bold; 
+      margin-top: 8px;
+    }
   </style>
 </head>
-<body class="has-banner">
+<body>
 
-  <!-- แถบแนะนำการติดตั้ง (ซ่อนอัตโนมัติหากเปิดแบบ Standalone) -->
-  <div id="install-banner">
-    <div class="text" id="guide-text">
-      <strong>💡 ติดตั้งแอปลงหน้าจอโฮม:</strong>
-      กำลังโหลดคำแนะนำ...
-    </div>
-    <button id="close-banner" onclick="dismissBanner()">✕</button>
-  </div>
-
+  <!-- ดึง Web App มาแสดง -->
   <div class="frame-container">
     <iframe 
       src="https://script.google.com/macros/s/AKfycbzcmLz13erVQdO1DlCkpOUo6-3ym4X-bTA6cmV3xpLOf8nH7HcC9ahdpH6qAkF_7Lqk/exec"
@@ -95,33 +79,54 @@
     </iframe>
   </div>
 
+  <!-- แถบแนะนำให้ติดตั้ง (จะโชว์ก็ต่อเมื่อยังไม่ได้ติดตั้ง) -->
+  <div id="installBanner">
+    <div id="installText">ติดตั้งแอปนี้ลงมือถือเพื่อการใช้งานที่รวดเร็ว</div>
+    <button id="installBtn" class="btn-install">ติดตั้ง (Install)</button>
+  </div>
+
   <script>
-    // ตรวจสอบว่าเปิดจาก Standalone Mode (ติดตั้งแล้ว) หรือไม่
-    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
-
-    if (isStandalone) {
-      document.body.classList.remove('has-banner');
-      document.getElementById('install-banner').style.display = 'none';
-    } else {
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      const guideText = document.getElementById('guide-text');
-
-      if (isIOS) {
-        guideText.innerHTML = "<strong>📲 ติดตั้งบน iPhone:</strong> กดปุ่มแชร์ ⎋ แล้วเลือก <b>'เพิ่มไปยังหน้าจอโฮม' (Add to Home Screen)</b>";
-      } else {
-        guideText.innerHTML = "<strong>📲 ติดตั้งบน Android:</strong> กดเมนู 3 จุด ⋮ แล้วเลือก <b>'ติดตั้งแอป'</b> หรือ <b>'เพิ่มลงในหน้าจอหลัก'</b>";
-      }
-    }
-
-    function dismissBanner() {
-      document.getElementById('install-banner').style.display = 'none';
-      document.body.classList.remove('has-banner');
-    }
-
-    // Service Worker Registration
+    // 1. ลงทะเบียน Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
     }
+
+    // 2. Logic การแจ้งเตือนติดตั้ง
+    const installBanner = document.getElementById('installBanner');
+    const installBtn = document.getElementById('installBtn');
+    const installText = document.getElementById('installText');
+    let deferredPrompt;
+
+    // เช็คระบบ iOS
+    const isIos = () => {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      return /iphone|ipad|ipod/.test(userAgent);
+    };
+    const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+
+    if (isIos() && !isInStandaloneMode()) {
+      installBanner.style.display = 'block';
+      installText.innerHTML = "<b>สำหรับ iOS:</b><br>กดปุ่ม Share (แชร์) ด้านล่าง<br>แล้วเลือก <b>'เพิ่มไปยังหน้าจอโฮม'</b> (Add to Home Screen)";
+      installBtn.style.display = 'none'; // ซ่อนปุ่ม เพราะ iOS กดติดตั้งจากปุ่มของระบบตรงๆ ไม่ได้
+    }
+
+    // เช็คระบบ Android / Chrome
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault(); // ป้องกันไม่ให้เบราว์เซอร์โชว์ Mini-infobar เริ่มต้น
+      deferredPrompt = e;
+      installBanner.style.display = 'block'; // โชว์ Banner
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt(); // โชว์ Popup ยืนยันการติดตั้ง
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          installBanner.style.display = 'none'; // ปิด Banner ทันทีเมื่อกดยอมรับ
+        }
+        deferredPrompt = null;
+      }
+    });
   </script>
 </body>
 </html>
